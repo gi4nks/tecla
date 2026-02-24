@@ -125,11 +125,11 @@ func newScanCmd() *cobra.Command {
 				ScanErrors:  scanErrs,
 			}
 
-			writer := cmd.OutOrStdout()
-			if output != "" {
-				file, err := os.Create(output)
-				if err != nil {
-					return err
+						writer := cmd.OutOrStdout()
+						if output != "" {
+							// #nosec G304 - output path is provided by the user
+							file, err := os.Create(output)
+							if err != nil {					return err
 				}
 				defer file.Close()
 				writer = file

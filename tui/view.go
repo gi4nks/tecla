@@ -27,6 +27,15 @@ var (
 	styleAction = lipgloss.NewStyle().Foreground(lipgloss.Color("#7D56F4"))
 	styleSelect = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
 	styleLabel  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7D56F4"))
+
+	styleHealthHigh = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // Green
+	styleHealthMid  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // Yellow
+	styleHealthLow  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // Red
+
+	styleCIsuc = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // Green
+	styleCIfail = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // Red
+	styleCIpend = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // Yellow
+	styleImpact = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F87")).Bold(true) // Pink/Salmon
 )
 
 func (m model) mainView() string {
@@ -144,9 +153,9 @@ func (m model) footerLines() []string {
 		keys = "esc:back | j/k:move"
 	default:
 		if isSmall {
-			keys = "q:quit | ent:det | /:filt | s:sort | r:scan | f:fetch | i:ign"
+			keys = "q:quit | ent:det | /:filt | s:sort | r:scan | f:fetch | x:doctor | p:prof | i:ign"
 		} else {
-			keys = "q:quit | j/k:move | enter:detail | /:filter | s:sort | r:rescan | f:fetch | i:ignore | e:errors"
+			keys = "q:quit | j/k:move | enter:detail | /:filter | s:sort | r:rescan | f:fetch | x:doctor | p:profile | i:ignore | e:errors"
 		}
 	}
 
@@ -195,14 +204,23 @@ func (m model) detailModeView() string {
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Workspace:"), styleDim.Render(repo.Workspace)))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Branch:"), styleAccent.Render(branchSummary(repo))))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Upstream:"), styleDim.Render(emptyDash(repo.Upstream))))
-	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Remote:"), styleDim.Render(emptyDash(repo.Remote))))
+	lines = append(lines, styleLabel.Render("Remotes:"))
+	for _, r := range repo.Remotes {
+		lines = append(lines, fmt.Sprintf("  %s %s %s (%d PRs)", styleAccent.Render(padRight(r.Name+":", 10)), styleDim.Render(r.URL), remoteSummary(r.Status), r.Status.PRCount))
+	}
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Ahead/Behind:"), styleDim.Render(aheadBehind(repo))))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Status:"), styleDim.Render(statusSummary(repo.Status))))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Staged:"), styleDim.Render(yesNo(repo.Status.Staged))))
 	lines = append(lines, fmt.Sprintf("%s %d", styleLabel.Render("Stash:"), repo.StashCount))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Submodules:"), styleDim.Render(submoduleSummary(repo.Submodules))))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Last Commit:"), styleDim.Render(timeAgo(repo.LastCommitAt))))
+	lines = append(lines, fmt.Sprintf("%s %d %s", styleLabel.Render("Health:"), repo.HealthScore, healthBar(repo.HealthScore, 10)))
 	lines = append(lines, "")
+
+	impactLines := m.impactView(repo)
+	if len(impactLines) > 0 {
+		lines = append(lines, impactLines...)
+	}
 
 	lines = renderRecommendations(lines, repo.Recommendations, contentWidth, m.recCursor)
 
@@ -247,10 +265,14 @@ func (m model) listView(height, width int) []string {
 
 	if len(lines) < height {
 		branchWidth := 12
-		pathWidth := maxInt(0, width-(branchWidth+6))
+		healthWidth := 5
+		remoteWidth := 10
+		pathWidth := maxInt(0, width-(branchWidth+healthWidth+remoteWidth+10))
 		pathCol := padRight("PATH", pathWidth)
 		branchCol := padRight("BRANCH", branchWidth)
-		headerRow := fmt.Sprintf("  %s %s %s", "S", pathCol, branchCol)
+		healthCol := padRight("HEALTH", healthWidth)
+		remoteCol := padRight("REMOTE", remoteWidth)
+		headerRow := fmt.Sprintf("  %s %s %s %s %s", "S", pathCol, branchCol, healthCol, remoteCol)
 		lines = append(lines, styleDim.Render(headerRow))
 	}
 
@@ -275,10 +297,14 @@ func (m model) listView(height, width int) []string {
 		}
 		status := statusChar(entry)
 		branchWidth := 12
-		pathWidth := maxInt(0, width-(branchWidth+6))
+		healthWidth := 5
+		remoteWidth := 10
+		pathWidth := maxInt(0, width-(branchWidth+healthWidth+remoteWidth+10))
 		path := padRight(shorten(repoPathSummaryMulti(m.opts.Roots, entry.Path), pathWidth), pathWidth)
 		branch := padRight(shorten(branchSummary(entry.Repo), branchWidth), branchWidth)
-		row := fmt.Sprintf("%s%s %s %s", selector, status, style.Render(path), styleDim.Render(branch))
+		health := healthBar(entry.Repo.HealthScore, healthWidth)
+		remote := padRight(remoteSummary(entry.Repo.RemoteStatus), remoteWidth)
+		row := fmt.Sprintf("%s%s %s %s %s %s", selector, status, style.Render(path), styleDim.Render(branch), health, remote)
 		lines = append(lines, row)
 	}
 
@@ -286,6 +312,55 @@ func (m model) listView(height, width int) []string {
 		lines = append(lines, "")
 	}
 	return lines
+}
+
+func remoteSummary(status gitinfo.RemoteStatus) string {
+	var ci string
+	switch status.CIStatus {
+	case "success":
+		ci = styleCIsuc.Render("✓")
+	case "failure":
+		ci = styleCIfail.Render("✗")
+	case "pending":
+		ci = styleCIpend.Render("○")
+	case "loading":
+		ci = styleDim.Render("…")
+	default:
+		ci = styleDim.Render("-")
+	}
+
+	var pr string
+	if status.CIStatus == "loading" {
+		pr = "…"
+	} else if status.PRCount > 0 {
+		pr = fmt.Sprintf("%d PR", status.PRCount)
+	} else {
+		pr = "-"
+	}
+
+	return fmt.Sprintf("%s %s", ci, styleDim.Render(pr))
+}
+
+func healthBar(score int, width int) string {
+	if width <= 0 {
+		return ""
+	}
+	filled := (score * width) / 100
+	if filled == 0 && score > 0 {
+		filled = 1
+	}
+
+	var style lipgloss.Style
+	if score < 50 {
+		style = styleHealthLow
+	} else if score < 80 {
+		style = styleHealthMid
+	} else {
+		style = styleHealthHigh
+	}
+
+	bar := strings.Repeat("■", filled) + styleDim.Render(strings.Repeat("□", width-filled))
+	return style.Render(bar)
 }
 
 func (m model) detailView(height, width int) []string {
@@ -304,13 +379,23 @@ func (m model) detailView(height, width int) []string {
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Workspace:"), styleDim.Render(repo.Workspace)))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Branch:"), styleAccent.Render(branchSummary(repo))))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Upstream:"), styleDim.Render(emptyDash(repo.Upstream))))
-	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Remote:"), styleDim.Render(emptyDash(repo.Remote))))
+	lines = append(lines, styleLabel.Render("Remotes:"))
+	for _, r := range repo.Remotes {
+		lines = append(lines, fmt.Sprintf("  %s %s (%d PRs)", styleAccent.Render(r.Name+":"), remoteSummary(r.Status), r.Status.PRCount))
+	}
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Ahead/Behind:"), styleDim.Render(aheadBehind(repo))))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Status:"), styleDim.Render(statusSummary(repo.Status))))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Staged:"), styleDim.Render(yesNo(repo.Status.Staged))))
 	lines = append(lines, fmt.Sprintf("%s %d", styleLabel.Render("Stash:"), repo.StashCount))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Submodules:"), styleDim.Render(submoduleSummary(repo.Submodules))))
 	lines = append(lines, fmt.Sprintf("%s %s", styleLabel.Render("Last Commit:"), styleDim.Render(timeAgo(repo.LastCommitAt))))
+	lines = append(lines, fmt.Sprintf("%s %d %s", styleLabel.Render("Health:"), repo.HealthScore, healthBar(repo.HealthScore, 10)))
+
+	impactLines := m.impactView(repo)
+	if len(impactLines) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, impactLines...)
+	}
 
 	lines = append(lines, "")
 	lines = renderRecommendations(lines, repo.Recommendations, width, m.recCursor)
@@ -332,6 +417,37 @@ func (m model) detailView(height, width int) []string {
 	for i := range lines {
 		lines[i] = pad(lines[i], width)
 	}
+	return lines
+}
+
+func (m model) impactView(repo gitinfo.RepoInfo) []string {
+	var lines []string
+	if repo.ModuleName == "" {
+		return nil
+	}
+
+	var dependents []string
+	for _, r := range m.repos {
+		if r.Path == repo.Path {
+			continue
+		}
+		for _, d := range r.Dependencies {
+			if d == repo.ModuleName {
+				dependents = append(dependents, r.Path)
+				break
+			}
+		}
+	}
+
+	if len(dependents) > 0 {
+		lines = append(lines, titleStyle.Render(" IMPACT ANALYSIS "))
+		lines = append(lines, styleImpact.Render(fmt.Sprintf("  ⚠ %d repositories depend on this module:", len(dependents))))
+		for _, d := range dependents {
+			lines = append(lines, styleDim.Render("  - ")+repoPathSummaryMulti(m.opts.Roots, d))
+		}
+		lines = append(lines, "")
+	}
+
 	return lines
 }
 

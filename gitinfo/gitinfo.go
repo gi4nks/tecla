@@ -2,6 +2,7 @@ package gitinfo
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gi4nks/tecla/internal/deps"
 	"github.com/gi4nks/tecla/internal/runner"
 )
 
@@ -37,6 +39,7 @@ type RepoInfo struct {
 	Path            string           `json:"path"`
 	Workspace       string           `json:"workspace"`
 	IsRepo          bool             `json:"is_repo"`
+	ModuleName      string           `json:"module_name"`
 	Branch          string           `json:"branch"`
 	Detached        bool             `json:"detached"`
 	IsEmpty         bool             `json:"is_empty"`
@@ -44,13 +47,79 @@ type RepoInfo struct {
 	Upstream        string           `json:"upstream"`
 	Ahead           int              `json:"ahead"`
 	Behind          int              `json:"behind"`
-	Remote          string           `json:"remote"`
+	Remote          string           `json:"remote"` // Primary remote URL (fallback)
+	Remotes         []RemoteDetail   `json:"remotes"`
 	StashCount      int              `json:"stash_count"`
 	Submodules      SubmoduleInfo    `json:"submodules"`
+	MergedBranches  []string         `json:"merged_branches"`
+	RemoteStatus    RemoteStatus     `json:"remote_status"` // Primary remote status
+	Dependencies    []string         `json:"dependencies"`
 	Recommendations []Recommendation `json:"recommendations"`
+	HealthScore     int              `json:"health_score"`
 	LastCommitAt    time.Time        `json:"last_commit_at,omitempty"`
 	Error           string           `json:"error,omitempty"`
 	Errors          []error          `json:"-"` // Added for structured errors
+}
+
+func (info *RepoInfo) CalculateHealthScore() {
+	score := 100
+	if info.Error != "" {
+		score -= 50
+	}
+	if info.Detached {
+		score -= 20
+	}
+	if info.Ahead > 0 {
+		score -= 10
+	}
+	if info.Behind > 0 {
+		score -= 5
+	}
+	if !info.Status.Clean {
+		score -= 10
+	}
+	if info.Status.Untracked {
+		score -= 5
+	}
+	if info.StashCount > 0 {
+		score -= 2
+	}
+	if info.Submodules.Dirty {
+		score -= 5
+	}
+	if len(info.MergedBranches) > 0 {
+		score -= minInt(20, len(info.MergedBranches)*2)
+	}
+
+	// Remote Health
+	switch info.RemoteStatus.CIStatus {
+	case "failure":
+		score -= 30
+	case "pending":
+		score -= 5
+	}
+
+	if score < 0 {
+		score = 0
+	}
+	info.HealthScore = score
+}
+
+func (info *RepoInfo) DoctorRecommendations() []Recommendation {
+	var recs []Recommendation
+	for _, r := range info.Recommendations {
+		if strings.HasPrefix(r.Text, "Cleanup") || strings.Contains(r.Text, "in progress") {
+			recs = append(recs, r)
+		}
+	}
+	return recs
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // Custom error types for better diagnostics
@@ -86,6 +155,17 @@ type StatusInfo struct {
 type SubmoduleInfo struct {
 	Count int  `json:"count"`
 	Dirty bool `json:"dirty"`
+}
+
+type RemoteStatus struct {
+	CIStatus string `json:"ci_status"` // success, failure, pending, unknown, loading
+	PRCount  int    `json:"pr_count"`
+}
+
+type RemoteDetail struct {
+	Name   string       `json:"name"`
+	URL    string       `json:"url"`
+	Status RemoteStatus `json:"status"`
 }
 
 type GlobalConfig struct {
@@ -166,17 +246,37 @@ func Collect(ctx context.Context, repos []string, opts Options, progress Progres
 }
 
 func InspectRepo(ctx context.Context, repo string, opts Options) RepoInfo {
+	modName, dependencies := deps.ScanRepo(repo)
+
 	info := RepoInfo{
-		Path:      repo,
-		Workspace: filepath.Base(filepath.Dir(repo)),
-		IsRepo:    IsRepo(repo),
+		Path:         repo,
+		Workspace:    filepath.Base(filepath.Dir(repo)),
+		IsRepo:       IsRepo(repo),
+		ModuleName:   modName,
+		Dependencies: dependencies,
 	}
 
 	if !info.IsRepo {
+		info.CalculateHealthScore()
 		info.Recommendations = buildNakedRecommendations(info)
 		return info
 	}
 
+	// Collect all remotes
+	remotes, _ := collectRemotes(ctx, repo, opts)
+	info.Remotes = remotes
+	if len(remotes) > 0 {
+		// Set primary remote for backward compatibility
+		info.Remote = remotes[0].URL
+		for _, r := range remotes {
+			if r.Name == "origin" {
+				info.Remote = r.URL
+				break
+			}
+		}
+		info.RemoteStatus = RemoteStatus{CIStatus: "loading"}
+	}
+	
 	statusOut, err := runGit(ctx, repo, opts.Timeout, "status", "--porcelain=v2", "-b")
 	if err != nil {
 		info.addError(&GitError{Op: "status", Err: err})
@@ -218,6 +318,11 @@ func InspectRepo(ctx context.Context, repo string, opts Options) RepoInfo {
 	}
 	info.Submodules = submodules
 
+	merged, mergedErr := mergedBranches(ctx, repo, opts)
+	if mergedErr == nil {
+		info.MergedBranches = merged
+	}
+
 	ops, opsErr := detectOperations(ctx, repo, opts)
 	if opsErr != nil {
 		info.addError(&GitError{Op: "operations", Err: opsErr})
@@ -231,7 +336,8 @@ func InspectRepo(ctx context.Context, repo string, opts Options) RepoInfo {
 		}
 	}
 
-	info.Recommendations = buildRecommendations(info, ops, opts)
+	info.Recommendations = buildRecommendations(info, ops, opts, info.MergedBranches)
+	info.CalculateHealthScore()
 	return info
 }
 
@@ -258,8 +364,15 @@ func isDetachedBranch(name string) bool {
 	return strings.HasPrefix(name, "(detached")
 }
 
-func buildRecommendations(info RepoInfo, ops operationState, opts Options) []Recommendation {
+func buildRecommendations(info RepoInfo, ops operationState, opts Options, merged []string) []Recommendation {
 	var recs []Recommendation
+
+	if len(merged) > 0 {
+		recs = append(recs, Recommendation{
+			Text:    fmt.Sprintf("Cleanup merged branches (%d): %s", len(merged), strings.Join(merged, ", ")),
+			Command: "git branch -d " + strings.Join(merged, " "),
+		})
+	}
 
 	if ops.Rebase {
 		recs = append(recs, Recommendation{Text: "Rebase in progress", Command: "git rebase --continue"})
@@ -356,6 +469,36 @@ func evaluateCondition(info RepoInfo, condition string) bool {
 	return false
 }
 
+func collectRemotes(ctx context.Context, repo string, opts Options) ([]RemoteDetail, error) {
+	out, err := runGit(ctx, repo, opts.Timeout, "remote", "-v")
+	if err != nil {
+		return nil, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	var remotes []RemoteDetail
+	seen := make(map[string]bool)
+
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || fields[len(fields)-1] != "(fetch)" {
+			continue
+		}
+		name := fields[0]
+		url := fields[1]
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		remotes = append(remotes, RemoteDetail{
+			Name:   name,
+			URL:    url,
+			Status: RemoteStatus{CIStatus: "loading"},
+		})
+	}
+	return remotes, nil
+}
+
 func remoteURL(ctx context.Context, repo string, opts Options) (string, error) {
 	out, err := runGit(ctx, repo, opts.Timeout, "remote", "get-url", "origin")
 	if err == nil {
@@ -373,16 +516,22 @@ func remoteURL(ctx context.Context, repo string, opts Options) (string, error) {
 
 func parseRemoteVerbose(output string) string {
 	lines := strings.Split(strings.TrimSpace(output), "\n")
+	var fallback string
 	for _, line := range lines {
 		fields := strings.Fields(line)
 		if len(fields) < 3 {
 			continue
 		}
-		if fields[0] == "origin" && fields[len(fields)-1] == "(fetch)" {
-			return fields[1]
+		if fields[len(fields)-1] == "(fetch)" {
+			if fields[0] == "origin" {
+				return fields[1]
+			}
+			if fallback == "" {
+				fallback = fields[1]
+			}
 		}
 	}
-	return ""
+	return fallback
 }
 
 func stashCount(ctx context.Context, repo string, opts Options) (int, error) {
@@ -415,6 +564,80 @@ func submoduleInfo(ctx context.Context, repo string, opts Options) (SubmoduleInf
 		}
 	}
 	return info, nil
+}
+
+func mergedBranches(ctx context.Context, repo string, opts Options) ([]string, error) {
+	// git branch --merged returns branches merged into current HEAD
+	out, err := runGit(ctx, repo, opts.Timeout, "branch", "--merged")
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	var merged []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "*") { // Skip current branch
+			continue
+		}
+		if isMainBranch(line) { // Don't recommend deleting main/master
+			continue
+		}
+		merged = append(merged, line)
+	}
+	return merged, nil
+}
+
+func FetchRemoteStatus(ctx context.Context, repo string, remoteURL string, timeout time.Duration) (RemoteStatus, error) {
+	status := RemoteStatus{CIStatus: "unknown"}
+
+	remoteTimeout := timeout
+	if remoteTimeout < 10*time.Second {
+		remoteTimeout = 10 * time.Second
+	}
+
+	if !strings.Contains(remoteURL, "github.com") {
+		return status, nil
+	}
+
+	// Fetch PR Count
+	prOut, prErr := runner.GlobalRunner.Run(ctx, repo, remoteTimeout, "gh", "pr", "list", "--json", "number")
+	if prErr != nil {
+		return status, fmt.Errorf("gh pr list: %w", prErr)
+	}
+	
+	if prOut != "" {
+		var prs []interface{}
+		if err := json.Unmarshal([]byte(prOut), &prs); err == nil {
+			status.PRCount = len(prs)
+		}
+	}
+
+	// Fetch CI Status
+	ciOut, ciErr := runner.GlobalRunner.Run(ctx, repo, remoteTimeout, "gh", "run", "list", "--limit", "1", "--json", "conclusion")
+	if ciErr != nil {
+		return status, fmt.Errorf("gh run list: %w", ciErr)
+	}
+
+	if ciOut != "" {
+		var runs []struct {
+			Conclusion string `json:"conclusion"`
+		}
+		if err := json.Unmarshal([]byte(ciOut), &runs); err == nil && len(runs) > 0 {
+			conclusion := strings.ToLower(runs[0].Conclusion)
+			switch conclusion {
+			case "success":
+				status.CIStatus = "success"
+			case "failure", "timed_out", "cancelled":
+				status.CIStatus = "failure"
+			case "pending", "in_progress", "queued", "":
+				status.CIStatus = "pending"
+			default:
+				status.CIStatus = "unknown"
+			}
+		}
+	}
+
+	return status, nil
 }
 
 func runGit(ctx context.Context, repo string, timeout time.Duration, args ...string) (string, error) {

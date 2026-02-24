@@ -12,7 +12,34 @@ Tecla is highly customizable through a JSON configuration file. By default, it l
 | `default_ignored_dirs` | `[]string` | Directory names to skip (e.g., `node_modules`, `.git`). |
 | `stale_threshold_days` | `int` | Number of days since the last commit after which a repo is marked "Stale". |
 | `auto_fetch` | `bool` | (Experimental) Automatically perform `git fetch` on startup. |
+| `profiles` | `[]Object` | Named groups of root paths for different working contexts. |
+| `active_profile` | `string` | The name of the profile currently in use. |
 | `custom_recommendations` | `[]Object` | Custom rules to trigger specific recommendations. |
+
+## Workspace Profiles
+
+Profiles allow you to switch between different groups of repositories without passing multiple `--root` flags every time.
+
+### Profile Structure
+- `name`: Unique identifier for the profile.
+- `roots`: List of directory paths to scan when this profile is active.
+
+### Example
+```json
+{
+  "active_profile": "work",
+  "profiles": [
+    {
+      "name": "work",
+      "roots": ["~/Projects/acme", "~/Projects/client-x"]
+    },
+    {
+      "name": "personal",
+      "roots": ["~/GitHub/gi4nks", "~/Documents/Notes"]
+    }
+  ]
+}
+```
 
 ## Custom Recommendations
 

@@ -208,7 +208,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.repos[i].RemoteStatus = primary.Status
 				}
-				
+
 				m.repos[i].CalculateHealthScore()
 				break
 			}

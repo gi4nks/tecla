@@ -276,7 +276,7 @@ func InspectRepo(ctx context.Context, repo string, opts Options) RepoInfo {
 		}
 		info.RemoteStatus = RemoteStatus{CIStatus: "loading"}
 	}
-	
+
 	statusOut, err := runGit(ctx, repo, opts.Timeout, "status", "--porcelain=v2", "-b")
 	if err != nil {
 		info.addError(&GitError{Op: "status", Err: err})
@@ -604,7 +604,7 @@ func FetchRemoteStatus(ctx context.Context, repo string, remoteURL string, timeo
 	if prErr != nil {
 		return status, fmt.Errorf("gh pr list: %w", prErr)
 	}
-	
+
 	if prOut != "" {
 		var prs []interface{}
 		if err := json.Unmarshal([]byte(prOut), &prs); err == nil {

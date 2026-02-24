@@ -56,7 +56,7 @@ func parseGoMod(path string) (string, []string) {
 			}
 			continue
 		}
-		
+
 		// Skip requirement lines that are just starting a block
 		if line == "require (" {
 			continue
@@ -68,7 +68,7 @@ func parseGoMod(path string) (string, []string) {
 			if target == "require" && len(parts) > 1 {
 				target = parts[1]
 			}
-			
+
 			if strings.Contains(target, ".") && !strings.HasPrefix(target, "//") {
 				deps = append(deps, target)
 			}
@@ -78,11 +78,11 @@ func parseGoMod(path string) (string, []string) {
 }
 
 func parsePackageJson(path string) (string, []string) {
-	// Simple string-based parsing to avoid heavy JSON dependencies if possible, 
+	// Simple string-based parsing to avoid heavy JSON dependencies if possible,
 	// but let's use a simple heuristic for dependencies
 	var name string
 	var deps []string
-	
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", nil

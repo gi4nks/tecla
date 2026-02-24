@@ -37,11 +37,26 @@ func newScanCmd() *cobra.Command {
 		Use:   "scan",
 		Short: "Scan root folder(s) for Git repositories",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err == nil {
+				exclude = append(exclude, cfg.IgnoredPaths...)
+			} else {
+				cfg = &config.Config{
+					DefaultIgnoredDirs: []string{"node_modules", "dist", "build", ".cache", ".venv", "target", ".terraform"},
+					StaleThresholdDays: 30,
+				}
+			}
+
 			if len(args) > 0 {
 				roots = append(roots, args...)
 			}
 			if len(roots) == 0 {
-				roots = []string{"."}
+				activeRoots := cfg.GetActiveRoots()
+				if len(activeRoots) > 0 {
+					roots = activeRoots
+				} else {
+					roots = []string{"."}
+				}
 			}
 			var absRoots []string
 			for _, r := range roots {
@@ -60,16 +75,6 @@ func newScanCmd() *cobra.Command {
 			case "table", "json", "markdown":
 			default:
 				return fmt.Errorf("unsupported format %q", format)
-			}
-
-			cfg, err := config.Load()
-			if err == nil {
-				exclude = append(exclude, cfg.IgnoredPaths...)
-			} else {
-				cfg = &config.Config{
-					DefaultIgnoredDirs: []string{"node_modules", "dist", "build", ".cache", ".venv", "target", ".terraform"},
-					StaleThresholdDays: 30,
-				}
 			}
 
 			repos, scanErrs := scanner.Scan(scanner.Options{

@@ -41,19 +41,6 @@ func newUICmd() *cobra.Command {
 }
 
 func runUI(roots []string, includeHidden bool, exclude []string, maxDepth int, workers int) error {
-	if len(roots) == 0 {
-		roots = []string{"."}
-	}
-	var absRoots []string
-	for _, root := range roots {
-		absRoot, err := filepath.Abs(root)
-		if err == nil {
-			absRoots = append(absRoots, absRoot)
-		} else {
-			absRoots = append(absRoots, root)
-		}
-	}
-
 	cfg, err := config.Load()
 	if err == nil {
 		exclude = append(exclude, cfg.IgnoredPaths...)
@@ -61,6 +48,25 @@ func runUI(roots []string, includeHidden bool, exclude []string, maxDepth int, w
 		cfg = &config.Config{
 			DefaultIgnoredDirs: []string{"node_modules", "dist", "build", ".cache", ".venv", "target", ".terraform"},
 			StaleThresholdDays: 30,
+		}
+	}
+
+	if len(roots) == 0 {
+		activeRoots := cfg.GetActiveRoots()
+		if len(activeRoots) > 0 {
+			roots = activeRoots
+		} else {
+			roots = []string{"."}
+		}
+	}
+
+	var absRoots []string
+	for _, root := range roots {
+		absRoot, err := filepath.Abs(root)
+		if err == nil {
+			absRoots = append(absRoots, absRoot)
+		} else {
+			absRoots = append(absRoots, root)
 		}
 	}
 

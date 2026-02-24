@@ -153,9 +153,9 @@ func (m model) footerLines() []string {
 		keys = "esc:back | j/k:move"
 	default:
 		if isSmall {
-			keys = "q:quit | ent:det | /:filt | s:sort | r:scan | f:fetch | x:doctor | p:prof | i:ign"
+			keys = "q:quit | ent:det | /:filt | s:sort | r:refr | f:fetch | x:doctor | p:prof | i:ign"
 		} else {
-			keys = "q:quit | j/k:move | enter:detail | /:filter | s:sort | r:rescan | f:fetch | x:doctor | p:profile | i:ignore | e:errors"
+			keys = "q:quit | j/k:move | enter:detail | /:filter | s:sort | r:refresh | f:fetch | x:doctor | p:profile | i:ignore | e:errors"
 		}
 	}
 

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/atotto/clipboard"
@@ -40,6 +41,10 @@ type remoteStatusResultMsg struct {
 	RemoteName string
 	Status     gitinfo.RemoteStatus
 	Err        error
+}
+
+type fullSyncFinishedMsg struct {
+	Err error
 }
 
 type globalConfigMsg struct {
@@ -215,6 +220,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.applySortFilter()
 		return m, nil
+	case fullSyncFinishedMsg:
+		if msg.Err != nil {
+			m.message = fmt.Sprintf("Deep refresh error: %v", msg.Err)
+		} else {
+			m.message = "Sync complete, updating local state..."
+		}
+		return m, scanCmd(m.opts)
 	case clipboardMsg:
 		if msg.err != nil {
 			m.message = fmt.Sprintf("Clipboard error: %v", msg.err)
@@ -338,8 +350,8 @@ func (m model) handleMainKey(key string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "r":
 		m.loading = true
-		m.message = "Rescanning..."
-		return m, tea.Batch(m.spinner.Tick, scanCmd(m.opts))
+		m.message = "Deep refreshing (fetching & scanning)..."
+		return m, tea.Batch(m.spinner.Tick, deepRefreshCmd(m.repos))
 	case "p":
 		return m, switchProfileCmd()
 	case "i":
@@ -719,6 +731,36 @@ func scanCmd(opts Options) tea.Cmd {
 			return infos[i].Path < infos[j].Path
 		})
 		return scanResultMsg{Repos: infos, Dirs: dirs, ScanErrors: scanErrs}
+	}
+}
+
+func deepRefreshCmd(repos []gitinfo.RepoInfo) tea.Cmd {
+	return func() tea.Msg {
+		var wg sync.WaitGroup
+		// Limit concurrency for fetching to avoid network/CPU saturation
+		semaphore := make(chan struct{}, 10)
+		var lastErr error
+
+		for _, repo := range repos {
+			if !repo.IsRepo || len(repo.Remotes) == 0 {
+				continue
+			}
+
+			wg.Add(1)
+			go func(path string) {
+				defer wg.Done()
+				semaphore <- struct{}{}
+				defer func() { <-semaphore }()
+
+				_, err := runner.GlobalRunner.RunShell(context.Background(), path, 60*time.Second, "git fetch --all")
+				if err != nil {
+					lastErr = err
+				}
+			}(repo.Path)
+		}
+
+		wg.Wait()
+		return fullSyncFinishedMsg{Err: lastErr}
 	}
 }
 

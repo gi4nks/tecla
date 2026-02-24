@@ -32,9 +32,9 @@ var (
 	styleHealthMid  = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // Yellow
 	styleHealthLow  = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // Red
 
-	styleCIsuc = lipgloss.NewStyle().Foreground(lipgloss.Color("10")) // Green
-	styleCIfail = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))  // Red
-	styleCIpend = lipgloss.NewStyle().Foreground(lipgloss.Color("11")) // Yellow
+	styleCIsuc  = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))                 // Green
+	styleCIfail = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))                  // Red
+	styleCIpend = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))                 // Yellow
 	styleImpact = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F87")).Bold(true) // Pink/Salmon
 )
 

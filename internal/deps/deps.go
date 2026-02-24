@@ -37,6 +37,7 @@ func ScanRepo(path string) (string, []string) {
 func parseGoMod(path string) (string, []string) {
 	var moduleName string
 	var deps []string
+	// #nosec G304 - path is derived from repository scan
 	file, err := os.Open(path)
 	if err != nil {
 		return "", nil
@@ -81,13 +82,13 @@ func parsePackageJson(path string) (string, []string) {
 	// Simple string-based parsing to avoid heavy JSON dependencies if possible,
 	// but let's use a simple heuristic for dependencies
 	var name string
-	var deps []string
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", nil
-	}
-
+		var deps []string
+		
+		// #nosec G304 - path is derived from repository scan
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", nil
+		}
 	lines := strings.Split(string(data), "\n")
 	inDeps := false
 	for _, line := range lines {

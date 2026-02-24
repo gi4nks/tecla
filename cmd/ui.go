@@ -5,9 +5,9 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/gi4nks/tecla/gitinfo"
 	"github.com/gi4nks/tecla/internal/config"
 	"github.com/gi4nks/tecla/tui"
-	"github.com/gi4nks/tecla/gitinfo"
 	"github.com/spf13/cobra"
 )
 

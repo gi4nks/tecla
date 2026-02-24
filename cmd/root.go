@@ -28,7 +28,7 @@ var rootCmd = &cobra.Command{
 		if verbose {
 			level = slog.LevelDebug
 		}
-		
+
 		// If we are in UI mode, we might want to disable logging or log to a file
 		// For now, we only log if verbose is set, otherwise we use a no-op handler
 		if verbose {

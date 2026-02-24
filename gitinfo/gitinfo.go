@@ -1,16 +1,16 @@
 package gitinfo
 
 import (
-		"context"
-		"fmt"
-		"os"
-		"path/filepath"
-		"sort"
-		"strings"
-		"sync"
-		"time"
-	
-		"github.com/gi4nks/tecla/internal/runner"
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/gi4nks/tecla/internal/runner"
 )
 
 type Options struct {
@@ -96,7 +96,7 @@ type GlobalConfig struct {
 
 func GetGlobalConfig(ctx context.Context, timeout time.Duration) GlobalConfig {
 	cfg := GlobalConfig{}
-	
+
 	out, err := runGit(ctx, ".", timeout, "version")
 	if err == nil {
 		cfg.Version = strings.TrimSpace(out)

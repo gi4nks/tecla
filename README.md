@@ -4,7 +4,8 @@
 
 Whether you're managing a single project or a directory with hundreds of microservices, Tecla helps you keep your local environment synchronized and clean.
 
-![GitHub workflow](https://github.com/gi4nks/tecla/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/gi4nks/tecla/actions/workflows/ci.yml/badge.svg)](https://github.com/gi4nks/tecla/actions/workflows/ci.yml)
+[![Release](https://github.com/gi4nks/tecla/actions/workflows/release.yml/badge.svg)](https://github.com/gi4nks/tecla/actions/workflows/release.yml)
 
 ## ✨ Key Features
 
@@ -22,7 +23,7 @@ Whether you're managing a single project or a directory with hundreds of microse
 ### Installation
 
 ```bash
-go install github.com/gi4nks/tecla/cmd/tecla@latest
+go install github.com/gi4nks/tecla@latest
 ```
 
 ### Usage
@@ -40,8 +41,8 @@ tecla scan --root ~/Projects --format markdown --output report.md
 # CI/CD health check
 tecla check --root ~/Projects --dirty --behind
 
-# Ignora permanentemente un percorso
-tecla ignore ./cartella-pesante
+# Permanently ignore a path
+tecla ignore ./heavy-folder
 ```
 
 ## 🖥️ Interactive TUI Shortcuts
@@ -99,21 +100,12 @@ See [docs/CI_CD.md](docs/CI_CD.md) for integration examples.
 
 ## 🛠️ Development
 
-### Prerequisites
-- Go 1.22+
-- Git
+For detailed information on building, testing, and contributing, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-### Build from source
+### Quick Build
 ```bash
 make build
-# or
-go build -o bin/tecla ./cmd/tecla/main.go
-```
-
-### Running Tests
-```bash
-go test -v ./...
 ```
 
 ## 📄 License
-This project is licensed under the MIT License.
+This project is licensed under the Apache License 2.0.

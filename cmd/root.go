@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	Version = "dev"
-	Commit  = ""
-	Date    = ""
+	Version   = "dev"
+	GitCommit = ""
+	BuildDate = ""
 )
 
 var (
@@ -57,14 +57,14 @@ func Execute() error {
 }
 
 func versionString() string {
-	if Commit == "" && Date == "" {
+	if GitCommit == "" && BuildDate == "" {
 		return Version
 	}
-	if Date == "" {
-		return fmt.Sprintf("%s (%s)", Version, Commit)
+	if BuildDate == "" {
+		return fmt.Sprintf("%s (%s)", Version, GitCommit)
 	}
-	if Commit == "" {
-		return fmt.Sprintf("%s (%s)", Version, Date)
+	if GitCommit == "" {
+		return fmt.Sprintf("%s (%s)", Version, BuildDate)
 	}
-	return fmt.Sprintf("%s (%s, %s)", Version, Commit, Date)
+	return fmt.Sprintf("%s (%s, %s)", Version, GitCommit, BuildDate)
 }

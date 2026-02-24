@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Install Tecla
-        run: go install github.com/gi4nks/tecla/cmd/tecla@latest
+        run: go install github.com/gi4nks/tecla@latest
         
       - name: Run Health Check
         run: tecla check --root . --dirty --behind

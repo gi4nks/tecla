@@ -1,16 +1,18 @@
-# Codebase Assessment & Evolution Report (v2.0)
+# Codebase Assessment & Evolution Report (v2.1)
 
 ## 1. Product Evolution Summary
 *   **Status:** Successfully matured from a multi-root management utility to a fully configurable, automation-ready Git ecosystem explorer.
 *   **Architecture:** Shifted from hardcoded behaviors to a configuration-driven model with a centralized execution runner.
 *   **Identity:** Consolidated around the "Lens" visual identity with enhanced interactivity (Clipboard, Batch, Multi-select).
+*   **Refinement:** Standardized project structure and CI/CD pipelines to align with modern Go best practices (Root `main.go`, Multi-stage Docker, GitHub Actions v4/v5).
 
 ## 2. Technical Milestones & Improvements
 
 ### **Infrastructure & Core Quality**
 *   **Unified Execution (`internal/runner`):** Replaced fragmented `os/exec` calls with a `Runner` interface, ensuring consistent timeout management (30s default) and shell execution patterns across the TUI and CLI.
 *   **Git Abstraction:** Decoupled `gitinfo` from direct system calls, facilitating the transition toward an integration-tested core.
-*   **CI/CD Pipeline:** Established a robust GitHub Actions workflow for automated testing and linting (`staticcheck`).
+*   **CI/CD Pipeline:** Established a robust GitHub Actions workflow for automated testing (Go 1.25), linting (`golangci-lint`, `staticcheck`), and security scanning (`gosec`, `govulncheck`).
+*   **Containerization:** Added a multi-stage `Dockerfile` for easy deployment and containerized execution.
 
 ### **Configuration & Extensibility**
 *   **Dynamic Policies:** Hardcoded stale thresholds (30 days) and ignore lists (node_modules, etc.) have been moved to `~/.config/tecla/config.json`.
@@ -24,6 +26,7 @@
 ## 3. Testing Strategy
 *   **Integration Layer:** Created `gitinfo_integration_test.go` to empirically validate repository state detection (clean, dirty, detached) using temporary on-disk Git environments.
 *   **Scanner Validation:** Expanded coverage for multi-root relative pathing and dynamic ignore patterns.
+*   **Security Scanning:** Integrated `gosec` and `govulncheck` into the CI pipeline to ensure codebase integrity.
 
 ## 4. Design & UX Refinement
 *   **Interactive Substitution:** Enhanced the command runner to support placeholder substitution (e.g., `<branch-name>`) via a dedicated TUI input mode.

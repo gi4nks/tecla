@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	docStyle    = lipgloss.NewStyle().Margin(1, 2)
-	titleStyle  = lipgloss.NewStyle().
+	docStyle   = lipgloss.NewStyle().Margin(1, 2)
+	titleStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#FAFAFA")).
 			Background(lipgloss.Color("#7D56F4")).
 			Padding(0, 1).
@@ -101,7 +101,7 @@ func (m model) gitConfigLine() string {
 	if cfg.UserName == "" && cfg.UserEmail == "" && cfg.Version == "" {
 		return ""
 	}
-	
+
 	parts := []string{}
 	if cfg.UserName != "" {
 		parts = append(parts, fmt.Sprintf("%s %s", styleLabel.Render("User:"), styleDim.Render(cfg.UserName)))
@@ -112,7 +112,7 @@ func (m model) gitConfigLine() string {
 	if cfg.Version != "" {
 		parts = append(parts, fmt.Sprintf("%s %s", styleLabel.Render("Git:"), styleDim.Render(cfg.Version)))
 	}
-	
+
 	return strings.Join(parts, "  ")
 }
 
@@ -130,7 +130,7 @@ func (m model) legendLine() string {
 func (m model) footerLines() []string {
 	var keys string
 	width := maxInt(0, m.width-4)
-	
+
 	isSmall := width < 80
 
 	switch m.mode {
@@ -404,20 +404,6 @@ func (m model) errorsView() string {
 	return docStyle.Render(s.String())
 }
 
-func repoPathSummary(root, path string) string {
-	if root == "" {
-		return path
-	}
-	rel, err := filepath.Rel(root, path)
-	if err != nil {
-		return path
-	}
-	if strings.HasPrefix(rel, "..") {
-		return path
-	}
-	return rel
-}
-
 func repoPathSummaryMulti(roots []string, path string) string {
 	for _, root := range roots {
 		rel, err := filepath.Rel(root, path)
@@ -432,7 +418,7 @@ func shorten(value string, max int) string {
 	if max <= 0 || lipgloss.Width(value) <= max {
 		return value
 	}
-	// Use a more robust way to truncate with ANSI codes if possible, 
+	// Use a more robust way to truncate with ANSI codes if possible,
 	// but for now, let's just ensure we are using lipgloss.Width correctly.
 	return truncate.StringWithTail(value, uint(max), "...")
 }
@@ -594,7 +580,7 @@ func renderRecommendations(lines []string, recs []gitinfo.Recommendation, width 
 	for i, rec := range recs {
 		prefix := fmt.Sprintf("%d. ", i+1)
 		indent := strings.Repeat(" ", len(prefix))
-		
+
 		text := rec.Text
 		if rec.Command != "" {
 			text = fmt.Sprintf("%s: `%s`", rec.Text, rec.Command)

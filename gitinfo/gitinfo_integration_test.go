@@ -22,19 +22,19 @@ func runGitCmd(t *testing.T, dir string, args ...string) {
 
 func setupTempRepo(t *testing.T) string {
 	dir := t.TempDir()
-	
+
 	// Create a stable git environment for tests
 	runGitCmd(t, dir, "init")
 	runGitCmd(t, dir, "config", "user.name", "Test User")
 	runGitCmd(t, dir, "config", "user.email", "test@example.com")
 	runGitCmd(t, dir, "config", "commit.gpgsign", "false")
-	
+
 	return dir
 }
 
 func TestInspectRepo_Clean(t *testing.T) {
 	dir := setupTempRepo(t)
-	
+
 	// Make a first commit
 	err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("hello"), 0644)
 	if err != nil {
@@ -58,7 +58,7 @@ func TestInspectRepo_Clean(t *testing.T) {
 
 func TestInspectRepo_Dirty(t *testing.T) {
 	dir := setupTempRepo(t)
-	
+
 	err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("hello"), 0644)
 	if err != nil {
 		t.Fatal(err)
@@ -86,14 +86,14 @@ func TestInspectRepo_Dirty(t *testing.T) {
 
 func TestInspectRepo_Detached(t *testing.T) {
 	dir := setupTempRepo(t)
-	
+
 	err := os.WriteFile(filepath.Join(dir, "README.md"), []byte("hello"), 0644)
 	if err != nil {
 		t.Fatal(err)
 	}
 	runGitCmd(t, dir, "add", ".")
 	runGitCmd(t, dir, "commit", "-m", "init")
-	
+
 	err = os.WriteFile(filepath.Join(dir, "README.md"), []byte("hello 2"), 0644)
 	if err != nil {
 		t.Fatal(err)

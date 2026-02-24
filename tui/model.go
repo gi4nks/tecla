@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -15,7 +16,6 @@ import (
 	"github.com/gi4nks/tecla/internal/config"
 	"github.com/gi4nks/tecla/internal/runner"
 	"github.com/gi4nks/tecla/scanner"
-	"github.com/atotto/clipboard"
 )
 
 type mode int
@@ -23,8 +23,8 @@ type mode int
 type sortMode int
 
 type entry struct {
-	Repo  gitinfo.RepoInfo
-	Path  string
+	Repo gitinfo.RepoInfo
+	Path string
 }
 
 type scanResultMsg struct {
@@ -39,7 +39,6 @@ type globalConfigMsg struct {
 }
 
 const (
-
 	modeMain mode = iota
 
 	modeFilter
@@ -49,49 +48,42 @@ const (
 	modeDetail
 
 	modeInput
-
 )
 
-
-
 const (
-
 	sortByName sortMode = iota
 
 	sortByDirty
 
 	sortByWorkspace
-
 )
 
-
-
 type model struct {
-	opts           Options
-	repos          []gitinfo.RepoInfo
-	globalConfig   gitinfo.GlobalConfig
-	dirs           []string
-	entries        []entry
-	scanErrors     []error
-	visible        []int
-	selected       map[string]bool
-	cursor         int
-	sortMode       sortMode
-	errorCursor    int
-	recCursor      int
-	commandResult  string
-	pendingCommand string
+	opts             Options
+	repos            []gitinfo.RepoInfo
+	globalConfig     gitinfo.GlobalConfig
+	dirs             []string
+	entries          []entry
+	scanErrors       []error
+	visible          []int
+	selected         map[string]bool
+	cursor           int
+	sortMode         sortMode
+	errorCursor      int
+	recCursor        int
+	commandResult    string
+	pendingCommand   string
 	inputPlaceholder string
-	filterInput    textinput.Model
-	detailViewport viewport.Model
-	filter         string
-	mode           mode
-	parentMode     mode
-	spinner        spinner.Model
-	loading        bool
-	message        string
-	width          int
-	height         int
+	filterInput      textinput.Model
+	detailViewport   viewport.Model
+	filter           string
+	mode             mode
+	parentMode       mode
+	spinner          spinner.Model
+	loading          bool
+	message          string
+	width            int
+	height           int
 }
 
 func newModel(opts Options) model {
@@ -316,7 +308,7 @@ func (m model) handleInputKey(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				fullCmd := strings.Replace(m.pendingCommand, m.inputPlaceholder, val, 1)
 				m.filterInput.Blur()
-				
+
 				// Check if there are more placeholders
 				if nextPlaceholder := findPlaceholder(fullCmd); nextPlaceholder != "" {
 					m.pendingCommand = fullCmd
@@ -462,7 +454,7 @@ func runBatchCommandCmd(paths []string, command string) tea.Cmd {
 		var lastErr error
 		for _, path := range paths {
 			out, err := runner.GlobalRunner.RunShell(context.Background(), path, 30*time.Second, command)
-			
+
 			allOutput.WriteString(fmt.Sprintf("[%s]\n%s\n", path, out))
 			if err != nil {
 				allOutput.WriteString(fmt.Sprintf("Error: %v\n", err))

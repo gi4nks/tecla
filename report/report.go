@@ -205,17 +205,6 @@ func emptyDash(value string) string {
 	return value
 }
 
-func actionsSummary(actions []gitinfo.Recommendation) string {
-	if len(actions) == 0 {
-		return "-"
-	}
-	var texts []string
-	for _, a := range actions {
-		texts = append(texts, a.Text)
-	}
-	return strings.Join(texts, "; ")
-}
-
 func actionsCountSummary(actions []gitinfo.Recommendation) string {
 	if len(actions) == 0 {
 		return "-"
@@ -350,10 +339,6 @@ func repoPathSummaryMulti(roots []string, path string) string {
 		}
 	}
 	return path
-}
-
-func repoPathSummary(root string, path string) string {
-	return repoPathSummaryMulti([]string{root}, path)
 }
 
 func shorten(value string, max int) string {

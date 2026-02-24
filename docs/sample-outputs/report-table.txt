@@ -1,0 +1,16 @@
+REPO    BRANCH        STATE               STAGED  AHEAD/BEHIND  UPSTREAM              REMOTE                                   STASH  SUBMODULES  ACTIONS    ERROR
+alpha   main          clean               no      0/0           origin/main           git@github.com:acme/alpha.git             -      -           -          -
+beta    feature/login modified+untracked  yes     2/1           origin/feature/login  https://github.com/acme/beta.git          1      2 dirty     6 actions  -
+gamma   main (empty)  clean               no      -             -                     -                                        -      -           2 actions  -
+
+Actions:
+- beta
+  - Review changes and stage them: `git add -A`
+  - Commit staged changes: `git commit`
+  - Push commits: `git push`
+  - Pull updates: `git pull --rebase` (or `git pull`)
+  - Review stashes: `git stash list` then apply/drop
+  - Update and commit submodule changes
+- gamma
+  - Create the first commit: `git add -A` then `git commit`
+  - Add a remote: `git remote add origin <url>`

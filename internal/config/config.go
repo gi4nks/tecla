@@ -62,6 +62,7 @@ func Load() (*Config, error) {
 		return defaultCfg(), nil
 	}
 
+	// #nosec G304 - path is derived from user home directory
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -98,7 +99,7 @@ func Save(cfg *Config) error {
 	}
 
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 
@@ -107,7 +108,7 @@ func Save(cfg *Config) error {
 		return err
 	}
 
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0600)
 }
 
 func (c *Config) AddIgnore(path string) bool {

@@ -25,6 +25,7 @@ func (r DefaultRunner) Run(ctx context.Context, dir string, timeout time.Duratio
 		defer cancel()
 	}
 
+	// #nosec G204 - command and arguments are dynamically provided to execute git commands
 	cmd := exec.CommandContext(cmdCtx, args[0], args[1:]...)
 	cmd.Dir = dir
 	output, err := cmd.CombinedOutput()
@@ -42,6 +43,7 @@ func (r DefaultRunner) Run(ctx context.Context, dir string, timeout time.Duratio
 }
 
 func (r DefaultRunner) RunShell(ctx context.Context, dir string, timeout time.Duration, command string) (string, error) {
+	// #nosec G204 - shell execution is a core feature for custom recommendations
 	return r.Run(ctx, dir, timeout, "sh", "-c", command)
 }
 

@@ -52,6 +52,7 @@ func Execute() error {
 	rootCmd.AddCommand(newUICmd())
 	rootCmd.AddCommand(newCheckCmd())
 	rootCmd.AddCommand(newIgnoreCmd())
+	rootCmd.AddCommand(newProfileCmd())
 	rootCmd.AddCommand(newVersionCmd())
 	return rootCmd.Execute()
 }

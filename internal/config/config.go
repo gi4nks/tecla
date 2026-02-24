@@ -13,12 +13,19 @@ type CustomRecommendation struct {
 	Command   string `json:"command,omitempty"`
 }
 
+type Profile struct {
+	Name  string   `json:"name"`
+	Roots []string `json:"roots"`
+}
+
 type Config struct {
 	IgnoredPaths          []string               `json:"ignored_paths"`
 	DefaultIgnoredDirs    []string               `json:"default_ignored_dirs"`
 	StaleThresholdDays    int                    `json:"stale_threshold_days"`
 	AutoFetch             bool                   `json:"auto_fetch"`
 	CustomRecommendations []CustomRecommendation `json:"custom_recommendations"`
+	Profiles              []Profile              `json:"profiles"`
+	ActiveProfile         string                 `json:"active_profile"`
 }
 
 func (c *Config) Validate() error {
@@ -119,4 +126,16 @@ func (c *Config) AddIgnore(path string) bool {
 	}
 	c.IgnoredPaths = append(c.IgnoredPaths, path)
 	return true
+}
+
+func (c *Config) GetActiveRoots() []string {
+	if c.ActiveProfile == "" {
+		return nil
+	}
+	for _, p := range c.Profiles {
+		if p.Name == c.ActiveProfile {
+			return p.Roots
+		}
+	}
+	return nil
 }

@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -34,8 +35,21 @@ type scanResultMsg struct {
 	Err        error
 }
 
+type remoteStatusResultMsg struct {
+	Path       string
+	RemoteName string
+	Status     gitinfo.RemoteStatus
+	Err        error
+}
+
 type globalConfigMsg struct {
 	Config gitinfo.GlobalConfig
+}
+
+type profileSwitchedMsg struct {
+	NewProfile string
+	NewRoots   []string
+	Err        error
 }
 
 const (
@@ -127,6 +141,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case globalConfigMsg:
 		m.globalConfig = msg.Config
 		return m, nil
+	case profileSwitchedMsg:
+		if msg.Err != nil {
+			m.message = fmt.Sprintf("Profile error: %v", msg.Err)
+		} else {
+			m.message = fmt.Sprintf("Switched to profile: %s", msg.NewProfile)
+			m.opts.Roots = msg.NewRoots
+			m.loading = true
+			return m, tea.Batch(m.spinner.Tick, scanCmd(m.opts))
+		}
+		return m, nil
 	case scanResultMsg:
 		m.loading = false
 		if msg.Err != nil {
@@ -137,6 +161,58 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.repos = msg.Repos
 		m.dirs = msg.Dirs
 		m.scanErrors = msg.ScanErrors
+		m.applySortFilter()
+
+		// Trigger remote status fetch for ALL remotes of each repo
+		var cmds []tea.Cmd
+		for _, repo := range m.repos {
+			if repo.IsRepo {
+				for _, r := range repo.Remotes {
+					cmds = append(cmds, fetchRemoteStatusCmd(repo.Path, r.Name, r.URL, m.opts.Timeout))
+				}
+			}
+		}
+		return m, tea.Batch(cmds...)
+	case remoteStatusResultMsg:
+		if msg.Err != nil {
+			m.scanErrors = append(m.scanErrors, fmt.Errorf("[%s] remote %s: %v", msg.Path, msg.RemoteName, msg.Err))
+		}
+		for i := range m.repos {
+			if m.repos[i].Path == msg.Path {
+				// Update the specific remote in the slice
+				for j := range m.repos[i].Remotes {
+					if m.repos[i].Remotes[j].Name == msg.RemoteName {
+						m.repos[i].Remotes[j].Status = msg.Status
+						if msg.Err != nil && m.repos[i].Remotes[j].Status.CIStatus == "loading" {
+							m.repos[i].Remotes[j].Status.CIStatus = "unknown"
+						}
+						break
+					}
+				}
+
+				// Synchronize the primary RemoteStatus for the list view
+				if len(m.repos[i].Remotes) > 0 {
+					primary := m.repos[i].Remotes[0]
+					for _, r := range m.repos[i].Remotes {
+						if r.Name == "origin" {
+							primary = r
+							break
+						}
+					}
+					// If we have an upstream and it has data, that might be more interesting
+					for _, r := range m.repos[i].Remotes {
+						if r.Name == "upstream" && r.Status.CIStatus != "unknown" && r.Status.CIStatus != "loading" {
+							primary = r
+							break
+						}
+					}
+					m.repos[i].RemoteStatus = primary.Status
+				}
+				
+				m.repos[i].CalculateHealthScore()
+				break
+			}
+		}
 		m.applySortFilter()
 		return m, nil
 	case clipboardMsg:
@@ -264,6 +340,8 @@ func (m model) handleMainKey(key string) (tea.Model, tea.Cmd) {
 		m.loading = true
 		m.message = "Rescanning..."
 		return m, tea.Batch(m.spinner.Tick, scanCmd(m.opts))
+	case "p":
+		return m, switchProfileCmd()
 	case "i":
 		if len(m.visible) > 0 {
 			entry := m.entries[m.visible[m.cursor]]
@@ -280,6 +358,26 @@ func (m model) handleMainKey(key string) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, tea.Batch(m.spinner.Tick, runBatchCommandCmd(paths, "git fetch --all"))
+	case "x":
+		m.loading = true
+		m.message = "Running Doctor (cleanup) on selected repositories..."
+		var paths []string
+		if len(m.selected) > 0 {
+			for p := range m.selected {
+				paths = append(paths, p)
+			}
+		} else if len(m.visible) > 0 {
+			entry := m.entries[m.visible[m.cursor]]
+			paths = append(paths, entry.Path)
+		}
+
+		if len(paths) == 0 {
+			m.loading = false
+			m.message = "No repositories to run Doctor on"
+			return m, nil
+		}
+
+		return m, tea.Batch(m.spinner.Tick, doctorCmd(m.repos, paths))
 	case "e":
 		m.mode = modeErrors
 		m.errorCursor = 0
@@ -433,6 +531,49 @@ func ignoreRepoCmd(path string) tea.Cmd {
 	}
 }
 
+func switchProfileCmd() tea.Cmd {
+	return func() tea.Msg {
+		cfg, err := config.Load()
+		if err != nil {
+			return profileSwitchedMsg{Err: err}
+		}
+
+		if len(cfg.Profiles) == 0 {
+			return profileSwitchedMsg{Err: fmt.Errorf("no profiles configured")}
+		}
+
+		nextIdx := 0
+		for i, p := range cfg.Profiles {
+			if p.Name == cfg.ActiveProfile {
+				nextIdx = (i + 1) % len(cfg.Profiles)
+				break
+			}
+		}
+
+		newProfile := cfg.Profiles[nextIdx]
+		cfg.ActiveProfile = newProfile.Name
+
+		if err := config.Save(cfg); err != nil {
+			return profileSwitchedMsg{Err: err}
+		}
+
+		var absRoots []string
+		for _, r := range newProfile.Roots {
+			abs, err := filepath.Abs(r)
+			if err != nil {
+				absRoots = append(absRoots, r)
+			} else {
+				absRoots = append(absRoots, abs)
+			}
+		}
+
+		return profileSwitchedMsg{
+			NewProfile: newProfile.Name,
+			NewRoots:   absRoots,
+		}
+	}
+}
+
 type commandFinishedMsg struct {
 	output string
 	err    error
@@ -461,6 +602,50 @@ func runBatchCommandCmd(paths []string, command string) tea.Cmd {
 				lastErr = err
 			}
 		}
+		return commandFinishedMsg{
+			output: allOutput.String(),
+			err:    lastErr,
+		}
+	}
+}
+
+func doctorCmd(allRepos []gitinfo.RepoInfo, paths []string) tea.Cmd {
+	return func() tea.Msg {
+		var allOutput strings.Builder
+		var lastErr error
+
+		pathSet := make(map[string]bool)
+		for _, p := range paths {
+			pathSet[p] = true
+		}
+
+		for _, repo := range allRepos {
+			if !pathSet[repo.Path] {
+				continue
+			}
+
+			recs := repo.DoctorRecommendations()
+			if len(recs) == 0 {
+				continue
+			}
+
+			allOutput.WriteString(fmt.Sprintf("[%s] Running cleanup...\n", repo.Path))
+			for _, rec := range recs {
+				if rec.Command == "" {
+					continue
+				}
+				allOutput.WriteString(fmt.Sprintf("  - %s: %s\n", rec.Text, rec.Command))
+				out, err := runner.GlobalRunner.RunShell(context.Background(), repo.Path, 30*time.Second, rec.Command)
+				if out != "" {
+					allOutput.WriteString(out + "\n")
+				}
+				if err != nil {
+					allOutput.WriteString(fmt.Sprintf("  Error: %v\n", err))
+					lastErr = err
+				}
+			}
+		}
+
 		return commandFinishedMsg{
 			output: allOutput.String(),
 			err:    lastErr,
@@ -503,6 +688,13 @@ func globalConfigCmd(opts Options) tea.Cmd {
 	return func() tea.Msg {
 		cfg := gitinfo.GetGlobalConfig(context.Background(), opts.Timeout)
 		return globalConfigMsg{Config: cfg}
+	}
+}
+
+func fetchRemoteStatusCmd(path, remoteName, remoteURL string, timeout time.Duration) tea.Cmd {
+	return func() tea.Msg {
+		status, err := gitinfo.FetchRemoteStatus(context.Background(), path, remoteURL, timeout)
+		return remoteStatusResultMsg{Path: path, RemoteName: remoteName, Status: status, Err: err}
 	}
 }
 

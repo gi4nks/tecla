@@ -10,10 +10,15 @@ Whether you're managing a single project or a directory with hundreds of microse
 ## ✨ Key Features
 
 - **Multi-Root Scanning:** Traversal of multiple disparate directory roots simultaneously.
+- **Smart Health Score:** Real-time calculation of repository "health" (0-100) based on local state, staleness, and CI/CD status.
+- **Impact Analysis:** Automatically detect dependencies between repositories in your workspace (supports Go and Node.js). Know what you might break before you change it.
+- **Interactive Doctor Mode:** One-key remediation to clean up merged branches and fix common issues across dozens of repos.
+- **Workspace Profiles:** Switch between different working contexts (e.g., `Work`, `Personal`, `Project-X`) with ease.
+- **Multi-Remote Awareness:** Integration with GitHub (via `gh` CLI) to show CI/CD status and pending Pull Requests for all your remotes (e.g., `origin` and `upstream`) simultaneously.
+- **Batch Operations:** Execute commands across multiple selected repositories at once.
 - **High-Performance:** Parallelized Git inspection using a configurable worker pool.
 - **Interactive TUI:** A modern terminal interface built with Bubble Tea for browsing, filtering, and managing repos.
 - **Recommendation Engine:** Intelligent advice on common Git workflows (syncing, stashing, rebasing).
-- **Batch Operations:** Execute commands across multiple selected repositories at once.
 - **CI/CD Integration:** A headless `check` mode for automated health diagnostics.
 - **Customizable:** Extensible via a JSON configuration file for custom ignore patterns and recommendation rules.
 - **Clipboard Support:** Quickly copy recommended commands to your clipboard.
@@ -41,6 +46,10 @@ tecla scan --root ~/Projects --format markdown --output report.md
 # CI/CD health check
 tecla check --root ~/Projects --dirty --behind
 
+# Manage workspace profiles
+tecla profile work
+tecla profile none
+
 # Permanently ignore a path
 tecla ignore ./heavy-folder
 ```
@@ -55,6 +64,8 @@ tecla ignore ./heavy-folder
 | `s` | Cycle through sort modes (Name, Dirty, Workspace) |
 | `Space` or `m` | Toggle selection for batch operations |
 | `b` | Execute a batch command on selected repositories |
+| `x` | **Doctor Mode**: Run automatic remediation (cleanup) on selected repos |
+| `p` | **Profiles**: Cycle through your configured workspace profiles |
 | `f` | Fetch updates for all repositories (`git fetch --all`) |
 | `r` | Rescan the workspace |
 | `e` | View scanner error logs |

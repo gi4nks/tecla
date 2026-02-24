@@ -1,38 +1,28 @@
-# Codebase Assessment & Evolution Report (v2.1)
+# Codebase Assessment & Evolution Report (v3.1 - Multi-Remote)
 
 ## 1. Product Evolution Summary
-*   **Status:** Successfully matured from a multi-root management utility to a fully configurable, automation-ready Git ecosystem explorer.
-*   **Architecture:** Shifted from hardcoded behaviors to a configuration-driven model with a centralized execution runner.
-*   **Identity:** Consolidated around the "Lens" visual identity with enhanced interactivity (Clipboard, Batch, Multi-select).
-*   **Refinement:** Standardized project structure and CI/CD pipelines to align with modern Go best practices (Root `main.go`, Multi-stage Docker, GitHub Actions v4/v5).
+*   **Status:** Advanced from single-remote monitoring to a full multi-remote tracking system.
+*   **Architecture:** Refactored `RepoInfo` to handle a collection of remotes, each with its own asynchronous state.
+*   **Identity:** Confirmed as a high-fidelity tool for developers working with forks and upstream repositories.
 
 ## 2. Technical Milestones & Improvements
 
-### **Infrastructure & Core Quality**
-*   **Unified Execution (`internal/runner`):** Replaced fragmented `os/exec` calls with a `Runner` interface, ensuring consistent timeout management (30s default) and shell execution patterns across the TUI and CLI.
-*   **Git Abstraction:** Decoupled `gitinfo` from direct system calls, facilitating the transition toward an integration-tested core.
-*   **CI/CD Pipeline:** Established a robust GitHub Actions workflow for automated testing (Go 1.25), linting (`golangci-lint`, `staticcheck`), and security scanning (`gosec`, `govulncheck`).
-*   **Containerization:** Added a multi-stage `Dockerfile` for easy deployment and containerized execution.
+### **Remote Awareness Evolution**
+*   **Multi-Remote Support:** Tecla now detects and monitors all defined git remotes (`origin`, `upstream`, etc.).
+*   **Parallel Status Fetching:** The TUI triggers concurrent GitHub API calls for every remote associated with a repository.
+*   **Intelligent Primary Selection:** The list view automatically selects the most relevant remote status (prioritizing `origin`, then `upstream`) while the detail view provides the full picture.
 
-### **Configuration & Extensibility**
-*   **Dynamic Policies:** Hardcoded stale thresholds (30 days) and ignore lists (node_modules, etc.) have been moved to `~/.config/tecla/config.json`.
-*   **Recommendation Engine v2:** Introduced a condition-based custom recommendation system. Users can now inject domain-specific rules (e.g., `is_detached`, `has_untracked`) with associated remediation commands.
-
-### **Functional Power-Ups**
-*   **Batch & Multi-select:** Implemented a new interaction layer in the TUI using `<space>`/`m` for selection and `b` for batch command execution across disparate paths.
-*   **Seamless Fetching:** Added a global `f` (fetch) shortcut to background the synchronization of all remote-linked repositories.
-*   **Clipboard Integration:** Integrated `atotto/clipboard` to allow non-destructive "Copy Recommendation" workflows via the `c` key.
+### **Robustness & Diagnostics**
+*   **Improved Remote Parsing:** The tool now correctly identifies remotes even if not named `origin`.
+*   **Async Error Handling:** Remote fetch failures (like authentication issues) are now captured and displayed in the error log (`e`).
+*   **JSON Resilience:** Replaced string-based parsing with robust JSON unmarshaling for GitHub CLI output.
 
 ## 3. Testing Strategy
-*   **Integration Layer:** Created `gitinfo_integration_test.go` to empirically validate repository state detection (clean, dirty, detached) using temporary on-disk Git environments.
-*   **Scanner Validation:** Expanded coverage for multi-root relative pathing and dynamic ignore patterns.
-*   **Security Scanning:** Integrated `gosec` and `govulncheck` into the CI pipeline to ensure codebase integrity.
+*   **Health Score Validation:** `gitinfo/health_test.go` ensures the scoring algorithm reflects real repository states.
+*   **Dependency Parsing:** `internal/deps/deps_test.go` validates module extraction from `go.mod` and `package.json`.
+*   **Integration Layer:** Maintained existing Git environment simulations for repository state detection.
 
-## 4. Design & UX Refinement
-*   **Interactive Substitution:** Enhanced the command runner to support placeholder substitution (e.g., `<branch-name>`) via a dedicated TUI input mode.
-*   **Footer Evolution:** Modernized the information hierarchy in the TUI to accommodate new shortcuts while maintaining the "Lens" spacious aesthetic.
-
-## 5. Future Roadmap
-*   **Interactive Doctor Mode:** Expand `check` mode to optionally offer interactive fixes for discovered issues.
-*   **Plugin System:** Allow custom condition evaluators via small Go plugins or embedded script engines (e.g., Lua).
-*   **Remote Health:** Integration with GitHub/GitLab APIs to report on PR status directly within the repository details.
+## 4. Future Roadmap
+*   **Interactive Doctor Mode:** Expand fixes to include automatic `gitignore` updates and linting alignment.
+*   **AI-Powered Semantic Search:** Integration of local vector search for commit messages and code snippets.
+*   **Plugin System:** Allow custom health metrics and dependency parsers via external configuration.
